@@ -17,7 +17,7 @@ interface PaletteVersion {
 }
 
 interface VersionHistoryPanelProps {
-  paletteId?: string
+  paletteId?: string | null
   isOpen: boolean
   onClose: () => void
   onRestoreVersion: (version: PaletteVersion) => void

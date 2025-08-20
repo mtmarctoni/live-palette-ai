@@ -13,7 +13,7 @@ export default async function LoginPage() {
   }
 
   // Check if user is already logged in
-  const supabase = createClient()
+  const supabase = await createClient()
   if (!supabase) {
     return <div>Supabase not configured</div>
   }

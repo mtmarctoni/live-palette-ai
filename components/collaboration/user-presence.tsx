@@ -3,34 +3,55 @@
 import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Users } from "lucide-react"
-import { socketManager, type User } from "@/lib/socket"
+import { supabase } from "@/lib/supabase/client"
+import { RealtimeChannel } from "@supabase/supabase-js"
+type User = {
+  id: string
+  email: string
+}
 
 export default function UserPresence() {
   const [users, setUsers] = useState<User[]>([])
   const [isConnected, setIsConnected] = useState(false)
 
   useEffect(() => {
-    const handleCollaborationState = (data: { users: User[] }) => {
-      setUsers(data.users.filter((user) => user.id !== "current-user")) // Filter out current user
+    // Get current user info from Supabase Auth
+    let userId = "anonymous"
+    let email = "anonymous@example.com"
+    if (typeof window !== "undefined") {
+      supabase.auth.getUser().then(({ data }) => {
+        if (data?.user) {
+          userId = data.user.id
+          email = data.user.email || "anonymous@example.com"
+        }
+      })
+    }
+
+    // Create a Supabase Realtime channel for user presence
+    const channel: RealtimeChannel = supabase.channel("user-presence", {
+      config: {
+        presence: {
+          key: userId,
+        },
+      },
+    })
+
+    
+    channel.on("presence" as any, {}, (presenceState: Record<string, User>) => {
+      // presenceState is a map of userId to user info
+      const userList: User[] = Object.values(presenceState)
+      setUsers(userList.filter((user) => user.id !== userId))
       setIsConnected(true)
-    }
-
-    const handleUserJoined = (user: User) => {
-      setUsers((prev) => [...prev.filter((u) => u.id !== user.id), user])
-    }
-
-    const handleUserLeft = (data: { userId: string }) => {
-      setUsers((prev) => prev.filter((user) => user.id !== data.userId))
-    }
-
-    socketManager.on("collaboration-state", handleCollaborationState)
-    socketManager.on("user-joined", handleUserJoined)
-    socketManager.on("user-left", handleUserLeft)
+    })
+    
+    channel.subscribe(async (status) => {
+      if (status !== 'SUBSCRIBED') { return }
+        channel.track({ id: userId, email })
+      
+    })
 
     return () => {
-      socketManager.off("collaboration-state", handleCollaborationState)
-      socketManager.off("user-joined", handleUserJoined)
-      socketManager.off("user-left", handleUserLeft)
+      channel.unsubscribe()
     }
   }, [])
 

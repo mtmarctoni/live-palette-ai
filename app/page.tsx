@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Sparkles, Download, History, Users, AlertCircle } from "lucide-react"
 import { PaletteDisplay } from "@/components/palette-display"
-import { socketManager } from "@/lib/socket"
 import { supabase } from "@/lib/supabase/client"
 import LiveCursors from "@/components/collaboration/live-cursors"
 import UserPresence from "@/components/collaboration/user-presence"
@@ -40,7 +39,7 @@ export default function HomePage() {
       setUser(user)
 
       if (user) {
-        socketManager.connect(user.id, user.email || "anonymous")
+        // set user with realtime supabase
       }
     }
 
@@ -53,15 +52,15 @@ export default function HomePage() {
       setUser(newUser)
 
       if (newUser) {
-        socketManager.connect(newUser.id, newUser.email || "anonymous")
+        // set user with realtime supabase
       } else {
-        socketManager.disconnect()
+        // set user with realtime supabase
       }
     })
 
     return () => {
       subscription.unsubscribe()
-      socketManager.disconnect()
+      // disconnect from realtime supabase
     }
   }, [])
 
@@ -87,9 +86,8 @@ export default function HomePage() {
       const data: PaletteResponse = await response.json()
       setCurrentPalette(data)
 
-      if (socketManager.connected) {
-        socketManager.emit("palette-update", { palette: data })
-      }
+      // if connected to RT supabase emit("palette-update", { palette: data })
+    
     } catch (err) {
       setError("Failed to generate palette. Please try again.")
       console.error("Error:", err)
@@ -145,15 +143,14 @@ export default function HomePage() {
     })
     setShowVersionHistory(false)
 
-    if (socketManager.connected) {
-      socketManager.emit("palette-update", {
-        palette: {
-          colors: version.colors,
-          keyword: currentPalette?.keyword || "Restored",
-          source: "fallback",
-        },
-      })
-    }
+    // if connected to RT supabase emit("palette-update", {
+    //   palette: {
+    //     colors: version.colors,
+    //     keyword: currentPalette?.keyword || "Restored",
+    //     source: "fallback",
+    //   },
+    // })
+    
   }
 
   return (
@@ -165,7 +162,7 @@ export default function HomePage() {
         <div className="absolute bottom-60 right-10 w-96 h-96 bg-primary rounded-full blur-xl animate-pulse delay-500"></div>
       </div>
 
-      <LiveCursors currentUser={user ? { id: user.id, email: user.email || "" } : undefined} />
+      <LiveCursors />
 
       <VersionHistoryPanel
         paletteId={currentPaletteId}

@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { socketManager } from "@/lib/socket"
+import { supabase } from "@/lib/supabase/client"
+import { RealtimeChannel } from "@supabase/supabase-js"
 import { PaletteDisplay } from "@/components/palette-display"
 
 interface CollaborativePaletteProps {
@@ -17,40 +18,50 @@ export default function CollaborativePalette({ palette, onPaletteUpdate }: Colla
   const [selectedColors, setSelectedColors] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    const handlePaletteUpdated = (data: { palette: any; updatedBy: { id: string; email: string } }) => {
-      onPaletteUpdate(data.palette)
-    }
+    // Create a Supabase Realtime channel for palette collaboration
+    const channel: RealtimeChannel = supabase.channel("collaborative-palette")
 
-    const handleColorSelected = (data: { userId: string; email: string; color: string }) => {
+    // Listen for palette updates
+    channel.on("broadcast", { event: "palette-updated" }, (payload) => {
+      onPaletteUpdate(payload.payload.palette)
+    })
+
+    // Listen for color selection
+    channel.on("broadcast", { event: "color-selected" }, (payload) => {
+      const { userId, color } = payload.payload
       setSelectedColors((prev) => ({
         ...prev,
-        [data.userId]: data.color,
+        [userId]: color,
       }))
-
-      // Clear selection after 2 seconds
       setTimeout(() => {
         setSelectedColors((prev) => {
           const newSelections = { ...prev }
-          delete newSelections[data.userId]
+          delete newSelections[userId]
           return newSelections
         })
       }, 2000)
-    }
+    })
 
-    socketManager.on("palette-updated", handlePaletteUpdated)
-    socketManager.on("color-selected", handleColorSelected)
+    channel.subscribe()
 
     return () => {
-      socketManager.off("palette-updated", handlePaletteUpdated)
-      socketManager.off("color-selected", handleColorSelected)
+      channel.unsubscribe()
     }
   }, [onPaletteUpdate])
 
-  const handleColorClick = (color: string) => {
-    // Emit color selection to other users
-    socketManager.emit("color-select", { color })
-
-    // Copy to clipboard
+  const handleColorClick = async (color: string) => {
+    // Get userId from Supabase Auth
+    let userId = "anonymous"
+    const { data } = await supabase.auth.getUser()
+    if (data?.user) {
+      userId = data.user.id
+    }
+    const channel: RealtimeChannel = supabase.channel("collaborative-palette")
+    channel.send({
+      type: "broadcast",
+      event: "color-selected",
+      payload: { userId, color },
+    })
     navigator.clipboard.writeText(color)
   }
 
