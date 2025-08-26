@@ -45,14 +45,17 @@ function getRandomUsername() {
   return `${adjectives[Math.floor(Math.random() * adjectives.length)]}${nouns[Math.floor(Math.random() * nouns.length)]}${Math.floor(Math.random() * 100)}`;
 }
 
-export default function LiveCursors() {
+type LiveCursorsProps = {
+  containerRef: React.RefObject<HTMLDivElement>
+}
+
+export default function LiveCursors({ containerRef }: LiveCursorsProps) {
   const [isConnected, setIsConnected] = useState(false)
   const [userCursors, setUserCursors] = useState<Record<string, CursorUser>>({})
   const [localCursorPosition, setLocalCursorPosition] = useState<CursorPosition>({ x: 50, y: 50 })
   const userId = useRef<string>(Math.random().toString(36).substring(2, 15))
   const userColor = useRef<string>(getRandomColor())
   const username = useRef<string>("")
-  const containerRef = useRef<HTMLDivElement>(null)
   const channelRef = useRef<RealtimeChannel | null>(null)
   const isInitialSetup = useRef(true)
 
@@ -195,32 +198,34 @@ export default function LiveCursors() {
     });
   }, [isConnected]);
 
-  // Track and broadcast mouse movement (global listener)
+  // Track and broadcast mouse movement (scoped to container)
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const relativeX = ((e.clientX - rect.left) / rect.width) * 100;
     const relativeY = ((e.clientY - rect.top) / rect.height) * 100;
-    const newPosition: CursorPosition = { x: relativeX, y: relativeY };
-    setLocalCursorPosition(newPosition);
-    broadcastCursorPosition(newPosition);
-    // Do NOT update own presence with cursor position
+    // Only broadcast if inside container bounds
+    if (relativeX >= 0 && relativeX <= 100 && relativeY >= 0 && relativeY <= 100) {
+      const newPosition: CursorPosition = { x: relativeX, y: relativeY };
+      setLocalCursorPosition(newPosition);
+      broadcastCursorPosition(newPosition);
+    }
   }, [broadcastCursorPosition]);
 
   useEffect(() => {
-    document.addEventListener("mousemove", handleMouseMove)
+    const container = containerRef.current;
+    if (!container) return;
+    container.addEventListener("mousemove", handleMouseMove);
     return () => {
-      document.removeEventListener("mousemove", handleMouseMove)
-    }
-  }, [handleMouseMove])
+      container.removeEventListener("mousemove", handleMouseMove);
+    };
+  }, [handleMouseMove]);
 
   return (
     <div
-      className="fixed inset-0 pointer-events-none z-50"
-      ref={containerRef}
-      style={{ cursor: 'none' }}
+      className="absolute inset-0 pointer-events-none z-50"
+      style={{ cursor: 'none', position: 'absolute', width: '100%', height: '100%' }}
     >
-
       {/* Other users' cursors */}
       {Object.entries(userCursors)
         .filter(([id]) => id !== userId.current)
@@ -234,15 +239,13 @@ export default function LiveCursors() {
               style={{
                 left: `${pos.x}%`,
                 top: `${pos.y}%`,
-                zIndex: 100,
-                transform: 'translate(-50%, -50%)'
+                zIndex: 100
               }}
             >
               <div
                 className="absolute w-3 h-3 rounded-full opacity-40"
                 style={{
                   backgroundColor: color,
-                  transform: 'translate(-50%, -50%)',
                   filter: 'blur(3px)'
                 }}
               />

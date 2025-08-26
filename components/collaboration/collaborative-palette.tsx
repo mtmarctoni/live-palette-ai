@@ -63,9 +63,10 @@ export default function CollaborativePalette({ palette, onPaletteUpdate, channel
 
   // Import LiveCursors locally to avoid global render
   const LiveCursors = require("@/components/collaboration/live-cursors").default;
+  const paletteContainerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="relative" style={{ position: "relative" }}>
+    <div className="relative" style={{ position: "relative" }} ref={paletteContainerRef}>
       <PaletteDisplay
         colors={palette.colors}
         keyword={palette.keyword}
@@ -73,8 +74,8 @@ export default function CollaborativePalette({ palette, onPaletteUpdate, channel
         onColorClick={handleColorClick}
         selectedColors={selectedColors}
       />
-      {/* LiveCursors only inside palette container */}
-      <LiveCursors />
+      {/* LiveCursors only inside palette container, pass ref */}
+      <LiveCursors containerRef={paletteContainerRef} />
     </div>
   )
 }
