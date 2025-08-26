@@ -275,6 +275,11 @@ export function PaletteDisplay({
     })
   }
 
+  // Sync editedColors with colors prop when colors changes
+  useEffect(() => {
+    setEditedColors(colors)
+  }, [colors])
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
       <Card className="overflow-hidden">
