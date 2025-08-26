@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from "react"
 import { supabase } from "@/lib/supabase/client"
-import { RealtimeChannel } from "@supabase/supabase-js"
 import { PaletteDisplay } from "@/components/palette-display"
 
 interface CollaborativePaletteProps {
@@ -15,12 +14,14 @@ interface CollaborativePaletteProps {
   channel?: any
 }
 
-export default function CollaborativePalette({ palette, onPaletteUpdate, channel }: CollaborativePaletteProps) {
+export default function CollaborativePalette({ palette: initialPalette, onPaletteUpdate, channel }: CollaborativePaletteProps) {
+  const [palette, setPalette] = useState(initialPalette)
   const [selectedColors, setSelectedColors] = useState<Record<string, string>>({})
-  const onPaletteUpdateRef = useRef(onPaletteUpdate)
-  useEffect(() => {
-    onPaletteUpdateRef.current = onPaletteUpdate
-  }, [onPaletteUpdate])
+  // Always call parent callback and update local state
+  const handlePaletteUpdate = (updatedPalette: any) => {
+    setPalette(updatedPalette)
+    onPaletteUpdate(updatedPalette)
+  }
 
   useEffect(() => {
     if (!channel) return
@@ -39,8 +40,13 @@ export default function CollaborativePalette({ palette, onPaletteUpdate, channel
         })
       }, 2000)
     })
+    // Listen for palette-updated broadcast to update local palette
+    channel.on("broadcast", { event: "palette-updated" }, (payload: any) => {
+      setPalette(payload.payload.palette)
+      onPaletteUpdate(payload.payload.palette)
+    })
     // No need to subscribe/unsubscribe here, handled in HomePage
-  }, [channel])
+  }, [channel, onPaletteUpdate])
 
   const handleColorClick = async (color: string) => {
     // Get userId from Supabase Auth
@@ -73,6 +79,8 @@ export default function CollaborativePalette({ palette, onPaletteUpdate, channel
         source={palette.source}
         onColorClick={handleColorClick}
         selectedColors={selectedColors}
+        channel={channel}
+        onPaletteUpdate={handlePaletteUpdate}
       />
       {/* LiveCursors only inside palette container, pass ref */}
       <LiveCursors containerRef={paletteContainerRef} />

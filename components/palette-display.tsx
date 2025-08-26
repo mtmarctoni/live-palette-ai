@@ -32,6 +32,8 @@ interface PaletteDisplayProps {
   selectedColors?: Record<string, string>
   onSave?: () => void
   onShowHistory?: () => void
+  channel?: any
+  onPaletteUpdate?: (palette: { colors: string[]; keyword: string; source: string }) => void
 }
 
 export function PaletteDisplay({
@@ -41,6 +43,8 @@ export function PaletteDisplay({
   onColorClick,
   onSave,
   onShowHistory,
+  channel,
+  onPaletteUpdate,
 }: PaletteDisplayProps) {
   const [copiedColor, setCopiedColor] = useState<string | null>(null)
   const [previewActive, setPreviewActive] = useState(false)
@@ -79,6 +83,12 @@ export function PaletteDisplay({
         newEditedColors[editingIndex] = stagingColor
         return newEditedColors
       })
+      // Notify parent of palette update after state update
+      onPaletteUpdate?.({
+        colors: editedColors.map((c, i) => (i === editingIndex ? stagingColor : c)),
+        keyword,
+        source,
+      })
       setEditingIndex(null)
       setStagingColor("")
     }
@@ -96,14 +106,26 @@ export function PaletteDisplay({
         newEditedColors[index] = originalColors[index]
         return newEditedColors
       })
+      // Notify parent of palette update after state update
+      onPaletteUpdate?.({
+        colors: editedColors.map((c, i) => (i === index ? originalColors[index] : c)),
+        keyword,
+        source,
+      })
     },
-    [originalColors],
+    [originalColors, onPaletteUpdate, keyword, source, editedColors],
   )
 
   const resetAllColorsToOriginal = useCallback(() => {
     setEditedColors([...originalColors])
     setEditingIndex(null)
-  }, [originalColors])
+    // Notify parent of palette update after state update
+    onPaletteUpdate?.({
+      colors: [...originalColors],
+      keyword,
+      source,
+    })
+  }, [originalColors, onPaletteUpdate, keyword, source])
 
   const copyToClipboard = async (color: string) => {
     await navigator.clipboard.writeText(color)
@@ -234,6 +256,30 @@ export function PaletteDisplay({
     }
   }
 
+  const handleSync = async () => {
+    if (!channel) {
+      alert("No realtime channel available")
+      return
+    }
+
+    channel.send({
+      type: "broadcast",
+      event: "palette-updated",
+      payload: {
+        palette: {
+          colors: editedColors,
+          keyword,
+          source,
+        },
+      },
+    })
+  }
+
+  // Sync editedColors with colors prop when colors changes
+  useEffect(() => {
+    setEditedColors(colors)
+  }, [colors])
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
       <Card className="overflow-hidden">
@@ -283,9 +329,9 @@ export function PaletteDisplay({
                   Save
                 </Button>
               )}
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={handleSync}>
                 <Share2 className="w-4 h-4 mr-2" />
-                Share
+                Sync
               </Button>
             </div>
           </div>
