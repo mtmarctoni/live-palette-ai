@@ -23,7 +23,6 @@ interface PaletteResponse {
 
 export default function HomePage() {
   const [session, setSession] = useState<Session | null>(null)
-  const [keyword, setKeyword] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [currentPalette, setCurrentPalette] = useState<PaletteResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -60,7 +59,7 @@ export default function HomePage() {
     };
   }, []);
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (keyword: string) => {
     if (!keyword.trim()) return
 
     setIsGenerating(true)
@@ -193,8 +192,7 @@ export default function HomePage() {
           <div className="max-w-4xl mx-auto mb-8">
             <PaletteGenerator
               onGenerate={(kw) => {
-                setKeyword(kw)
-                handleGenerate()
+                handleGenerate(kw)
               }}
               isGenerating={isGenerating}
             />
@@ -206,21 +204,7 @@ export default function HomePage() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-
-          <div className="flex flex-wrap justify-center gap-2 mb-12">
-            {["energetic startup", "calm healthcare", "luxury brand", "nature inspired", "tech minimal"].map(
-              (sample) => (
-                <Badge
-                  key={sample}
-                  variant="outline"
-                  className="cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors"
-                  onClick={() => setKeyword(sample)}
-                >
-                  {sample}
-                </Badge>
-              ),
-            )}
-          </div>
+        
         </div>
 
         {currentPalette && (

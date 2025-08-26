@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Sparkles, Palette } from "lucide-react"
+import { Badge } from "./ui/badge"
 
 interface PaletteGeneratorProps {
   onGenerate: (keyword: string) => void
@@ -72,11 +73,18 @@ export function PaletteGenerator({ onGenerate, isGenerating }: PaletteGeneratorP
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground text-center">Try these popular keywords:</p>
           <div className="flex flex-wrap gap-2 justify-center">
-            {sampleKeywords.map((sample) => (
-              <Button key={sample} variant="outline" size="sm" onClick={() => setKeyword(sample)} className="text-xs">
-                {sample}
-              </Button>
-            ))}
+            {sampleKeywords.map(
+              (sample) => (
+                <Badge
+                  key={sample}
+                  variant="outline"
+                  className="cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors"
+                  onClick={() => setKeyword(sample)}
+                >
+                  {sample}
+                </Badge>
+              ),
+            )}
           </div>
         </div>
       </CardContent>
