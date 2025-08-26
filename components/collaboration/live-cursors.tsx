@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react"
 import { supabase } from "@/lib/supabase/client"
 import type { RealtimeChannel } from "@supabase/supabase-js"
+import { createPortal } from "react-dom"
 
 type CursorPosition = { x: number; y: number }
 
@@ -276,14 +277,14 @@ export default function LiveCursors({ containerRef }: LiveCursorsProps) {
         </div>
       )}
 
-      {/* Active users list */}
-      <div className="absolute top-4 right-4 flex gap-2 flex-col justify-end">
+      {/* Active users list*/}
+      <div className="fixed bottom-4 right-4 flex gap-2 flex-col justify-end z-100">
         {Object.entries(userCursors)
           .filter(([id]) => id !== userId.current)
           .map(([id, { username, color }]) => (
             <div
               key={id}
-              className="flex items-center gap-2 p-1.5 pl-2 pr-3 rounded-full bg-neutral-800 text-neutral-200 text-xs font-medium"
+              className="flex items-center gap-2 p-1.5 pl-2 pr-3 rounded-full bg-background text-foregrond text-xs font-medium"
             >
               <div
                 className="w-2 h-2 rounded-full"
@@ -294,7 +295,7 @@ export default function LiveCursors({ containerRef }: LiveCursorsProps) {
           ))}
         {/* Include yourself in the list */}
         <div
-          className="flex items-center gap-2 p-1.5 pl-2 pr-3 rounded-full bg-neutral-800 text-neutral-200 text-xs font-medium"
+          className="flex items-center gap-2 p-1.5 pl-2 pr-3 rounded-full bg-primary text-neutral-200 text-xs font-medium"
         >
           <div
             className="w-2 h-2 rounded-full"
@@ -302,7 +303,8 @@ export default function LiveCursors({ containerRef }: LiveCursorsProps) {
           ></div>
           {username.current} (you)
         </div>
-      </div>
+          </div>
+      
     </div>
   )
 }
