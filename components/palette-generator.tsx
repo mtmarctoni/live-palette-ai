@@ -35,7 +35,7 @@ export function PaletteGenerator({ onGenerate, isGenerating }: PaletteGeneratorP
   ]
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full mx-auto">
       <CardHeader className="text-center">
         <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
           <Palette className="w-6 h-6 text-primary" />

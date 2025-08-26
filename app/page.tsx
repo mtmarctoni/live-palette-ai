@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { PaletteGenerator } from "@/components/palette-generator"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -191,24 +191,14 @@ export default function HomePage() {
             marketers, and creative professionals.
           </p>
 
-          <div className="max-w-md mx-auto mb-8">
-            <div className="flex gap-2">
-              <Input
-                placeholder="e.g., energetic startup, calm healthcare..."
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
-                className="flex-1"
-              />
-              <Button onClick={handleGenerate} disabled={isGenerating || !keyword.trim()} className="px-6">
-                {isGenerating ? (
-                  <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4" />
-                )}
-                {isGenerating ? "Generating..." : "Generate"}
-              </Button>
-            </div>
+          <div className="max-w-4xl mx-auto mb-8">
+            <PaletteGenerator
+              onGenerate={(kw) => {
+                setKeyword(kw)
+                handleGenerate()
+              }}
+              isGenerating={isGenerating}
+            />
           </div>
 
           {error && (
