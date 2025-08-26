@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef, useCallback } from "react"
 import { supabase } from "@/lib/supabase/client"
 import type { RealtimeChannel } from "@supabase/supabase-js"
-import { createPortal } from "react-dom"
 
 type CursorPosition = { x: number; y: number }
 
@@ -47,7 +46,7 @@ function getRandomUsername() {
 }
 
 type LiveCursorsProps = {
-  containerRef: React.RefObject<HTMLDivElement>
+  containerRef: React.RefObject<HTMLDivElement> 
 }
 
 export default function LiveCursors({ containerRef }: LiveCursorsProps) {
@@ -90,7 +89,6 @@ export default function LiveCursors({ containerRef }: LiveCursorsProps) {
 
   // Setup channel and presence
   useEffect(() => {
-    let isMounted = true;
     const channel = supabase.channel("live-cursors");
     channelRef.current = channel;
 
@@ -179,7 +177,6 @@ export default function LiveCursors({ containerRef }: LiveCursorsProps) {
 
     // Cleanup (always unsubscribe channel)
     return () => {
-      isMounted = false;
       channel.unsubscribe();
     };
   }, [localCursorPosition]);
@@ -211,7 +208,7 @@ export default function LiveCursors({ containerRef }: LiveCursorsProps) {
       setLocalCursorPosition(newPosition);
       broadcastCursorPosition(newPosition);
     }
-  }, [broadcastCursorPosition]);
+  }, [broadcastCursorPosition, containerRef]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -220,7 +217,7 @@ export default function LiveCursors({ containerRef }: LiveCursorsProps) {
     return () => {
       container.removeEventListener("mousemove", handleMouseMove);
     };
-  }, [handleMouseMove]);
+  }, [handleMouseMove, containerRef]);
 
   return (
     <div

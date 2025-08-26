@@ -1,20 +1,15 @@
-"use client"
+"use client";
 
 // Store original CSS variables for reverting
-const originalColors: Record<string, string> = {}
-let isOriginalStored = false
-let injectedStyleElement: HTMLStyleElement | null = null
-
-function getCurrentTheme(): "light" | "dark" {
-  if (typeof window === "undefined") return "light"
-  return document.documentElement.classList.contains("dark") ? "dark" : "light"
-}
+const originalColors: Record<string, string> = {};
+let isOriginalStored = false;
+let injectedStyleElement: HTMLStyleElement | null = null;
 
 function createThemeCSS(colors: string[]): string {
   // Ensure we have exactly 11 colors for the complete system
   if (colors.length < 11) {
-    console.warn("Incomplete color system received, using fallback mapping")
-    return createLegacyThemeCSS(colors)
+    console.warn("Incomplete color system received, using fallback mapping");
+    return createLegacyThemeCSS(colors);
   }
 
   // Extract colors by their intended purpose
@@ -30,7 +25,7 @@ function createThemeCSS(colors: string[]): string {
     darkFg,
     darkMuted,
     darkBorder, // Dark theme (7-10)
-  ] = colors
+  ] = colors;
 
   return `
     :root {
@@ -66,13 +61,13 @@ function createThemeCSS(colors: string[]): string {
       --popover: ${darkMuted};
       --popover-foreground: ${darkFg};
     }
-  `
+  `;
 }
 
 function createLegacyThemeCSS(colors: string[]): string {
-  const extendedColors = [...colors]
+  const extendedColors = [...colors];
   while (extendedColors.length < 5) {
-    extendedColors.push(...colors)
+    extendedColors.push(...colors);
   }
 
   return `
@@ -88,14 +83,14 @@ function createLegacyThemeCSS(colors: string[]): string {
       --sidebar-primary: ${extendedColors[0]};
       --sidebar-accent: ${extendedColors[2]};
     }
-  `
+  `;
 }
 
 function storeOriginalColors() {
-  if (isOriginalStored) return
+  if (isOriginalStored) return;
 
-  const root = document.documentElement
-  const computedStyle = getComputedStyle(root)
+  const root = document.documentElement;
+  const computedStyle = getComputedStyle(root);
 
   const colorVars = [
     "--primary",
@@ -117,61 +112,64 @@ function storeOriginalColors() {
     "--chart-5",
     "--sidebar-primary",
     "--sidebar-accent",
-  ]
+  ];
 
   colorVars.forEach((varName) => {
-    originalColors[varName] = computedStyle.getPropertyValue(varName).trim()
-  })
+    originalColors[varName] = computedStyle.getPropertyValue(varName).trim();
+  });
 
-  isOriginalStored = true
+  isOriginalStored = true;
 }
 
 export function applyPaletteToTheme(colors: string[]) {
-  storeOriginalColors()
+  storeOriginalColors();
 
   if (injectedStyleElement) {
-    injectedStyleElement.remove()
+    injectedStyleElement.remove();
   }
 
-  injectedStyleElement = document.createElement("style")
-  injectedStyleElement.id = "v0-palette-preview"
-  injectedStyleElement.textContent = createThemeCSS(colors)
-  document.head.appendChild(injectedStyleElement)
+  injectedStyleElement = document.createElement("style");
+  injectedStyleElement.id = "v0-palette-preview";
+  injectedStyleElement.textContent = createThemeCSS(colors);
+  document.head.appendChild(injectedStyleElement);
 }
 
 export function revertToOriginalTheme() {
   if (injectedStyleElement) {
-    injectedStyleElement.remove()
-    injectedStyleElement = null
+    injectedStyleElement.remove();
+    injectedStyleElement = null;
   }
 }
 
 export function isPreviewActive(): boolean {
-  return injectedStyleElement !== null && document.head.contains(injectedStyleElement)
+  return (
+    injectedStyleElement !== null &&
+    document.head.contains(injectedStyleElement)
+  );
 }
 
 export function toggleTheme() {
-  if (typeof window === "undefined") return
+  if (typeof window === "undefined") return;
 
-  const root = document.documentElement
-  const isDark = root.classList.contains("dark")
+  const root = document.documentElement;
+  const isDark = root.classList.contains("dark");
 
   if (isDark) {
-    root.classList.remove("dark")
-    localStorage.setItem("theme", "light")
+    root.classList.remove("dark");
+    localStorage.setItem("theme", "light");
   } else {
-    root.classList.add("dark")
-    localStorage.setItem("theme", "dark")
+    root.classList.add("dark");
+    localStorage.setItem("theme", "dark");
   }
 }
 
 export function initializeTheme() {
-  if (typeof window === "undefined") return
+  if (typeof window === "undefined") return;
 
-  const savedTheme = localStorage.getItem("theme")
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
+  const savedTheme = localStorage.getItem("theme");
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
 
   if (savedTheme === "dark" || (!savedTheme && prefersDark)) {
-    document.documentElement.classList.add("dark")
+    document.documentElement.classList.add("dark");
   }
 }

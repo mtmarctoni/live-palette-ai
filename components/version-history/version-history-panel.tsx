@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { History, RotateCcw, X, Clock } from "lucide-react"
+import { History, RotateCcw, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Session } from "@supabase/supabase-js"
 
@@ -19,7 +19,6 @@ interface PaletteVersion {
 
 interface VersionHistoryPanelProps {
   session: Session | null
-  paletteId?: string | null // kept for compatibility, but not used for fetching
   isOpen: boolean
   onClose: () => void
   onRestoreVersion: (version: PaletteVersion, paletteId: string) => void
@@ -27,7 +26,6 @@ interface VersionHistoryPanelProps {
 
 export default function VersionHistoryPanel({
   session,
-  paletteId,
   isOpen,
   onClose,
   onRestoreVersion,
@@ -36,17 +34,7 @@ export default function VersionHistoryPanel({
   const [loading, setLoading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (isOpen && session) {
-      fetchAllPalettes()
-    }
-  }, [isOpen, session])
-
-  const fetchVersions = async () => {
-    // replaced by fetchAllPalettes
-  }
-
-  const fetchAllPalettes = async () => {
+  const fetchAllPalettes = useCallback(async () => {
     setLoading(true)
     try {
       // Fetch all palettes for the user
@@ -65,11 +53,13 @@ export default function VersionHistoryPanel({
     } finally {
       setLoading(false)
     }
-  }
+  }, [session])
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString()
-  }
+  useEffect(() => {
+    if (isOpen && session) {
+      fetchAllPalettes()
+    }
+  }, [isOpen, session, fetchAllPalettes])
 
   const handleDeletePalette = async (paletteId: string) => {
     if (!session?.access_token) return

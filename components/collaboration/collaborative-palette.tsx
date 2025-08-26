@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react"
 import { supabase } from "@/lib/supabase/client"
 import { PaletteDisplay } from "@/components/palette-display"
+import LiveCursors from "./live-cursors"
 
 interface CollaborativePaletteProps {
   palette: {
@@ -17,6 +18,8 @@ interface CollaborativePaletteProps {
 export default function CollaborativePalette({ palette: initialPalette, onPaletteUpdate, channel }: CollaborativePaletteProps) {
   const [palette, setPalette] = useState(initialPalette)
   const [selectedColors, setSelectedColors] = useState<Record<string, string>>({})
+  const paletteContainerRef = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>;
+
   // Always call parent callback and update local state
   const handlePaletteUpdate = (updatedPalette: any) => {
     setPalette(updatedPalette)
@@ -66,10 +69,6 @@ export default function CollaborativePalette({ palette: initialPalette, onPalett
   }
 
   if (!palette) return null
-
-  // Import LiveCursors locally to avoid global render
-  const LiveCursors = require("@/components/collaboration/live-cursors").default;
-  const paletteContainerRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className="relative" style={{ position: "relative" }} ref={paletteContainerRef}>

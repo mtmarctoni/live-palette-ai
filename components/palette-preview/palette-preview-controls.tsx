@@ -4,7 +4,6 @@ import { Eye, RotateCcw, Palette, Check } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 
 interface PalettePreviewControlsProps {
-  colors: string[]
   isPreviewActive: boolean
   onPreview: () => void
   onApply: () => void
@@ -12,7 +11,6 @@ interface PalettePreviewControlsProps {
 }
 
 export function PalettePreviewControls({
-  colors,
   isPreviewActive,
   onPreview,
   onApply,

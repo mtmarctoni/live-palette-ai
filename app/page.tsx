@@ -13,7 +13,7 @@ import Header from "@/components/layout/Header"
 import Footer from "@/components/layout/Footer"
 import { supabase } from "@/lib/supabase/client"
 import VersionHistoryPanel from "@/components/version-history/version-history-panel"
-import type { Session, User as SupabaseUser } from "@supabase/supabase-js"
+import type { RealtimeChannel, Session, User as SupabaseUser } from "@supabase/supabase-js"
 
 interface PaletteResponse {
   colors: string[]
@@ -30,7 +30,7 @@ export default function HomePage() {
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [showVersionHistory, setShowVersionHistory] = useState(false)
   const [currentPaletteId, setCurrentPaletteId] = useState<string | null>(null)
-  const channelRef = useRef<any>(null)
+  const channelRef = useRef<RealtimeChannel>(null)
 
   useEffect(() => {
     // Create and subscribe to the collaborative-palette channel once
@@ -169,7 +169,6 @@ export default function HomePage() {
 
       <VersionHistoryPanel
         session={session}
-        paletteId={currentPaletteId}
         isOpen={showVersionHistory}
         onClose={() => setShowVersionHistory(false)}
         onRestoreVersion={handleRestoreVersion}
