@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react"
 import { supabase } from "@/lib/supabase/client"
-import { RealtimeChannel } from "@supabase/supabase-js"
+import type { RealtimeChannel } from "@supabase/supabase-js"
 
 type CursorPosition = { x: number; y: number }
 
@@ -67,7 +67,7 @@ export default function LiveCursors({ containerRef }: LiveCursorsProps) {
       if (!isMounted) return;
       if (data?.user) {
         userId.current = data.user.id;
-        username.current = data.user.user_metadata?.username || data.user.email || getRandomUsername();
+        username.current = data.user.user_metadata?.username || getRandomUsername();
       } else {
         username.current = getRandomUsername();
       }
@@ -76,7 +76,7 @@ export default function LiveCursors({ containerRef }: LiveCursorsProps) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         userId.current = session.user.id;
-        username.current = session.user.user_metadata?.username || session.user.email || getRandomUsername();
+        username.current = session.user.user_metadata?.username || getRandomUsername();
       } else {
         username.current = getRandomUsername();
       }

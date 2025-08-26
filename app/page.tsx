@@ -12,7 +12,6 @@ import { useRef } from "react"
 import Header from "@/components/layout/Header"
 import Footer from "@/components/layout/Footer"
 import { supabase } from "@/lib/supabase/client"
-import LiveCursors from "@/components/collaboration/live-cursors"
 import VersionHistoryPanel from "@/components/version-history/version-history-panel"
 import type { Session, User as SupabaseUser } from "@supabase/supabase-js"
 
@@ -167,8 +166,6 @@ export default function HomePage() {
         <div className="absolute bottom-80 left-20 w-64 h-64 bg-accent rounded-full blur-2xl animate-pulse delay-2000"></div>
         <div className="absolute bottom-60 right-10 w-96 h-96 bg-primary rounded-full blur-xl animate-pulse delay-500"></div>
       </div>
-
-  {/* LiveCursors moved inside CollaborativePalette, not global */}
 
       <VersionHistoryPanel
         session={session}
