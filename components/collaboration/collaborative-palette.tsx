@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { supabase } from "@/lib/supabase/client"
 import { RealtimeChannel } from "@supabase/supabase-js"
 import { PaletteDisplay } from "@/components/palette-display"
@@ -16,14 +16,18 @@ interface CollaborativePaletteProps {
 
 export default function CollaborativePalette({ palette, onPaletteUpdate }: CollaborativePaletteProps) {
   const [selectedColors, setSelectedColors] = useState<Record<string, string>>({})
+  const onPaletteUpdateRef = useRef(onPaletteUpdate)
+  useEffect(() => {
+    onPaletteUpdateRef.current = onPaletteUpdate
+  }, [onPaletteUpdate])
 
   useEffect(() => {
-    // Create a Supabase Realtime channel for palette collaboration
+    // Create a Supabase Realtime channel for palette collaboration (only once)
     const channel: RealtimeChannel = supabase.channel("collaborative-palette")
 
     // Listen for palette updates
     channel.on("broadcast", { event: "palette-updated" }, (payload) => {
-      onPaletteUpdate(payload.payload.palette)
+      onPaletteUpdateRef.current(payload.payload.palette)
     })
 
     // Listen for color selection
@@ -47,7 +51,7 @@ export default function CollaborativePalette({ palette, onPaletteUpdate }: Colla
     return () => {
       channel.unsubscribe()
     }
-  }, [onPaletteUpdate])
+  }, [])
 
   const handleColorClick = async (color: string) => {
     // Get userId from Supabase Auth
