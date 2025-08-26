@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Sparkles, Download, History, Users, AlertCircle } from "lucide-react"
 import CollaborativePalette from "@/components/collaboration/collaborative-palette"
+import { useRef } from "react"
 import Header from "@/components/layout/Header"
 import Footer from "@/components/layout/Footer"
 import { supabase } from "@/lib/supabase/client"
@@ -30,33 +31,42 @@ export default function HomePage() {
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [showVersionHistory, setShowVersionHistory] = useState(false)
   const [currentPaletteId, setCurrentPaletteId] = useState<string | null>(null)
+  const channelRef = useRef<any>(null)
 
   useEffect(() => {
-  const getAuthData = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    setUser(user);
-    const { data: { session } } = await supabase.auth.getSession();
-    setSession(session);
-  };
+    // Create and subscribe to the collaborative-palette channel once
+    if (!channelRef.current) {
+      channelRef.current = supabase.channel("collaborative-palette")
+      channelRef.current.on("broadcast", { event: "palette-updated" }, (payload: any) => {
+        setCurrentPalette(payload.payload.palette)
+      })
+      channelRef.current.subscribe()
+    }
+    const getAuthData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+    };
 
-  getAuthData();
+    getAuthData();
 
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-    setUser(session?.user ?? null);
-    setSession(session ?? null);
-  });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      setSession(session ?? null);
+    });
 
-  return () => {
-    subscription.unsubscribe();
-  };
-}, []);
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const handleGenerate = async () => {
     if (!keyword.trim()) return
 
-  setIsGenerating(true)
-  setError(null)
-  setCurrentPaletteId(null)
+    setIsGenerating(true)
+    setError(null)
+    setCurrentPaletteId(null)
 
     try {
       const response = await fetch("/api/generate-palette", {
@@ -74,13 +84,14 @@ export default function HomePage() {
       const data: PaletteResponse = await response.json()
       setCurrentPalette(data)
 
-      // Broadcast palette update to Supabase Realtime
-      const channel = supabase.channel("collaborative-palette")
-      channel.send({
-        type: "broadcast",
-        event: "palette-updated",
-        payload: { palette: data },
-      })
+      // Broadcast palette update to Supabase Realtime using the shared channel
+      if (channelRef.current) {
+        channelRef.current.send({
+          type: "broadcast",
+          event: "palette-updated",
+          payload: { palette: data },
+        })
+      }
     } catch (err) {
       setError("Failed to generate palette. Please try again.")
       console.error("Error:", err)
@@ -157,7 +168,7 @@ export default function HomePage() {
         <div className="absolute bottom-60 right-10 w-96 h-96 bg-primary rounded-full blur-xl animate-pulse delay-500"></div>
       </div>
 
-      <LiveCursors />
+  {/* LiveCursors moved inside CollaborativePalette, not global */}
 
       <VersionHistoryPanel
         session={session}
@@ -231,6 +242,7 @@ export default function HomePage() {
             <CollaborativePalette
               palette={currentPalette}
               onPaletteUpdate={(palette) => setCurrentPalette(palette)}
+              channel={channelRef.current}
             />
             {user && (
               <div className="flex justify-center mt-6">

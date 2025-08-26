@@ -12,9 +12,10 @@ interface CollaborativePaletteProps {
     source: "ai" | "fallback"
   } | null
   onPaletteUpdate: (palette: any) => void
+  channel?: any
 }
 
-export default function CollaborativePalette({ palette, onPaletteUpdate }: CollaborativePaletteProps) {
+export default function CollaborativePalette({ palette, onPaletteUpdate, channel }: CollaborativePaletteProps) {
   const [selectedColors, setSelectedColors] = useState<Record<string, string>>({})
   const onPaletteUpdateRef = useRef(onPaletteUpdate)
   useEffect(() => {
@@ -22,16 +23,9 @@ export default function CollaborativePalette({ palette, onPaletteUpdate }: Colla
   }, [onPaletteUpdate])
 
   useEffect(() => {
-    // Create a Supabase Realtime channel for palette collaboration (only once)
-    const channel: RealtimeChannel = supabase.channel("collaborative-palette")
-
-    // Listen for palette updates
-    channel.on("broadcast", { event: "palette-updated" }, (payload) => {
-      onPaletteUpdateRef.current(payload.payload.palette)
-    })
-
+    if (!channel) return
     // Listen for color selection
-    channel.on("broadcast", { event: "color-selected" }, (payload) => {
+    channel.on("broadcast", { event: "color-selected" }, (payload: any) => {
       const { userId, color } = payload.payload
       setSelectedColors((prev) => ({
         ...prev,
@@ -45,13 +39,8 @@ export default function CollaborativePalette({ palette, onPaletteUpdate }: Colla
         })
       }, 2000)
     })
-
-    channel.subscribe()
-
-    return () => {
-      channel.unsubscribe()
-    }
-  }, [])
+    // No need to subscribe/unsubscribe here, handled in HomePage
+  }, [channel])
 
   const handleColorClick = async (color: string) => {
     // Get userId from Supabase Auth
@@ -60,19 +49,23 @@ export default function CollaborativePalette({ palette, onPaletteUpdate }: Colla
     if (data?.user) {
       userId = data.user.id
     }
-    const channel: RealtimeChannel = supabase.channel("collaborative-palette")
-    channel.send({
-      type: "broadcast",
-      event: "color-selected",
-      payload: { userId, color },
-    })
+    if (channel) {
+      channel.send({
+        type: "broadcast",
+        event: "color-selected",
+        payload: { userId, color },
+      })
+    }
     navigator.clipboard.writeText(color)
   }
 
   if (!palette) return null
 
+  // Import LiveCursors locally to avoid global render
+  const LiveCursors = require("@/components/collaboration/live-cursors").default;
+
   return (
-    <div className="relative">
+    <div className="relative" style={{ position: "relative" }}>
       <PaletteDisplay
         colors={palette.colors}
         keyword={palette.keyword}
@@ -80,6 +73,8 @@ export default function CollaborativePalette({ palette, onPaletteUpdate }: Colla
         onColorClick={handleColorClick}
         selectedColors={selectedColors}
       />
+      {/* LiveCursors only inside palette container */}
+      <LiveCursors />
     </div>
   )
 }

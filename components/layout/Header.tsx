@@ -1,5 +1,4 @@
 import { Sparkles, History } from "lucide-react"
-import UserPresence from "@/components/collaboration/user-presence"
 import { ThemeToggle } from "@/components/theme-toggle"
 import AuthButton from "@/components/auth/auth-button"
 import { Button } from "@/components/ui/button"
@@ -28,7 +27,7 @@ export default function Header({ onShowHistory, showHistoryDisabled }: HeaderPro
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <UserPresence />
+
             <ThemeToggle />
             <Button
               variant="outline"
