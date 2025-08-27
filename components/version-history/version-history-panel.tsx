@@ -8,20 +8,13 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { History, RotateCcw, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Session } from "@supabase/supabase-js"
-
-interface PaletteVersion {
-  id: string
-  version_number: number
-  colors: string[]
-  description?: string
-  created_at: string
-}
+import { Palette, StoredUserPalettes } from "@/app/types/global"
 
 interface VersionHistoryPanelProps {
   session: Session | null
   isOpen: boolean
   onClose: () => void
-  onRestoreVersion: (version: PaletteVersion, paletteId: string) => void
+  onRestoreVersion: (palette: Palette) => void
 }
 
 export default function VersionHistoryPanel({
@@ -30,29 +23,30 @@ export default function VersionHistoryPanel({
   onClose,
   onRestoreVersion,
 }: VersionHistoryPanelProps) {
-  const [palettes, setPalettes] = useState<any[]>([])
+  const [palettes, setPalettes] = useState<StoredUserPalettes[]>([])
   const [loading, setLoading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const fetchAllPalettes = useCallback(async () => {
     setLoading(true)
-    try {
-      // Fetch all palettes for the user
-      const response = await fetch(`/api/palettes`, {
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session?.access_token}`,
-        },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setPalettes(data.palettes)
-      }
-    } catch (error) {
-      console.error("Failed to fetch palettes:", error)
-    } finally {
-      setLoading(false)
-    }
+try {
+  const response = await fetch(`/api/palettes`, {
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${session?.access_token}`,
+    },
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Failed to fetch palettes");
+  }
+  const data = await response.json();
+  setPalettes(data.palettes);
+} catch (error) {
+  console.error("Failed to fetch palettes:", error);
+} finally {
+  setLoading(false);
+}
   }, [session])
 
   useEffect(() => {
@@ -129,17 +123,14 @@ export default function VersionHistoryPanel({
                         >
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
-                              <Badge variant="secondary">{palette.name}</Badge>
-                              <span className="text-xs text-muted-foreground">{palette.description}</span>
+                              <Badge variant="secondary">{palette.keywords.join(", ")}</Badge>
                             </div>
                             <div className="flex gap-2">
                               <Button variant="outline" size="sm" onClick={() => onRestoreVersion({
-                                id: palette.id,
-                                version_number: 1,
                                 colors: palette.colors,
-                                description: palette.description,
-                                created_at: palette.created_at,
-                              }, palette.id)}>
+                                keywords: palette.keywords,
+                                is_ai_generated: palette.is_ai_generated,
+                              })}>
                                 <RotateCcw className="w-3 h-3 mr-1" />
                                 Restore
                               </Button>

@@ -6,14 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   Copy,
-  Download,
   Heart,
   Share2,
   Check,
   Sparkles,
   Zap,
   History,
-  ChevronDown,
   Sun,
   Moon,
   Edit,
@@ -21,25 +19,21 @@ import {
   X,
 } from "lucide-react"
 import { motion } from "framer-motion"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { PaletteExport } from "@/components/palette-export"
 import { applyPaletteToTheme, revertToOriginalTheme } from "@/lib/color-theme-manager"
+import type { Palette } from "@/app/types/global"
 
 interface PaletteDisplayProps {
-  colors: string[]
-  keyword: string
-  source?: "ai" | "fallback"
+  palette: Palette
   onColorClick?: (color: string) => void
-  selectedColors?: Record<string, string>
   onSave?: () => void
   onShowHistory?: () => void
   channel?: any
-  onPaletteUpdate?: (palette: { colors: string[]; keyword: string; source: string }) => void
+  onPaletteUpdate?: (palette: Palette) => void
 }
 
 export function PaletteDisplay({
-  colors,
-  keyword,
-  source = "ai",
+  palette,
   onColorClick,
   onSave,
   onShowHistory,
@@ -48,10 +42,16 @@ export function PaletteDisplay({
 }: PaletteDisplayProps) {
   const [copiedColor, setCopiedColor] = useState<string | null>(null)
   const [previewActive, setPreviewActive] = useState(false)
-  const [originalColors] = useState<string[]>(colors)
-  const [editedColors, setEditedColors] = useState<string[]>(colors)
+  const [originalColors, setOriginalColors] = useState<string[]>(palette.colors)
+  const [editedColors, setEditedColors] = useState<string[]>(palette.colors)
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [stagingColor, setStagingColor] = useState<string>("")
+  
+    // Sync editedColors with colors prop when colors changes
+  useEffect(() => {
+    setOriginalColors(palette.colors)
+    setEditedColors(palette.colors)
+  }, [palette.colors])
 
   const colorLabels = [
     "Primary",
@@ -78,16 +78,12 @@ export function PaletteDisplay({
 
   const applyColorEdit = () => {
     if (editingIndex !== null) {
-      setEditedColors((prev) => {
-        const newEditedColors = [...prev]
-        newEditedColors[editingIndex] = stagingColor
-        return newEditedColors
-      })
-      // Notify parent of palette update after state update
+      const updatedColors = editedColors.map((c, i) => (i === editingIndex ? stagingColor : c))
+      setEditedColors(updatedColors)
       onPaletteUpdate?.({
-        colors: editedColors.map((c, i) => (i === editingIndex ? stagingColor : c)),
-        keyword,
-        source,
+        colors: updatedColors,
+        keywords: [palette.keywords[0]],
+        is_ai_generated: palette.is_ai_generated,
       })
       setEditingIndex(null)
       setStagingColor("")
@@ -109,11 +105,11 @@ export function PaletteDisplay({
       // Notify parent of palette update after state update
       onPaletteUpdate?.({
         colors: editedColors.map((c, i) => (i === index ? originalColors[index] : c)),
-        keyword,
-        source,
+        keywords: [palette.keywords[0]],
+        is_ai_generated: palette.is_ai_generated,
       })
     },
-    [originalColors, onPaletteUpdate, keyword, source, editedColors],
+    [originalColors, onPaletteUpdate, palette, editedColors],
   )
 
   const resetAllColorsToOriginal = useCallback(() => {
@@ -122,10 +118,10 @@ export function PaletteDisplay({
     // Notify parent of palette update after state update
     onPaletteUpdate?.({
       colors: [...originalColors],
-      keyword,
-      source,
+      keywords: [palette.keywords[0]],
+      is_ai_generated: palette.is_ai_generated,
     })
-  }, [originalColors, onPaletteUpdate, keyword, source])
+  }, [originalColors, onPaletteUpdate, palette])
 
   const copyToClipboard = async (color: string) => {
     await navigator.clipboard.writeText(color)
@@ -153,132 +149,24 @@ export function PaletteDisplay({
     setPreviewActive(false)
   }
 
-  const exportPalette = (format: "css" | "scss" | "adobe" | "json" | "tailwind" | "figma") => {
-    let content = ""
-    let filename = `${keyword.replace(/\s+/g, "-")}-palette`
-
-    const colorsToExport = editedColors
-
-    switch (format) {
-      case "css":
-        content = `:root {\n${colorsToExport.map((color, i) => `  --color-${i + 1}: ${color};`).join("\n")}\n}`
-        filename += ".css"
-        break
-      case "scss":
-        content = colorsToExport.map((color, i) => `$color-${i + 1}: ${color};`).join("\n")
-        filename += ".scss"
-        break
-      case "adobe":
-        content = colorsToExport.join("\n")
-        filename += ".txt"
-        break
-      case "json":
-        content = JSON.stringify(
-          {
-            name: keyword,
-            colors: colorsToExport.map((color, i) => ({
-              name: `Color ${i + 1}`,
-              hex: color,
-              rgb: hexToRgb(color),
-              hsl: hexToHsl(color),
-            })),
-          },
-          null,
-          2,
-        )
-        filename += ".json"
-        break
-      case "tailwind":
-        content = `module.exports = {\n  theme: {\n    extend: {\n      colors: {\n${colorsToExport.map((color, i) => `        'palette-${i + 1}': '${color}',`).join("\n")}\n      }\n    }\n  }\n}`
-        filename += ".js"
-        break
-      case "figma":
-        content = colorsToExport.map((color, i) => `${color.replace("#", "")},Color ${i + 1}`).join("\n")
-        filename += ".txt"
-        break
-    }
-
-    const blob = new Blob([content], { type: "text/plain" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const hexToRgb = (hex: string) => {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-    return result
-      ? {
-          r: Number.parseInt(result[1], 16),
-          g: Number.parseInt(result[2], 16),
-          b: Number.parseInt(result[3], 16),
-        }
-      : null
-  }
-
-  const hexToHsl = (hex: string) => {
-    const rgb = hexToRgb(hex)
-    if (!rgb) return null
-
-    const r = rgb.r / 255
-    const g = rgb.g / 255
-    const b = rgb.b / 255
-
-    const max = Math.max(r, g, b)
-    const min = Math.min(r, g, b)
-    let h = 0,
-      s = 0
-    const l = (max + min) / 2
-
-    if (max !== min) {
-      const d = max - min
-      s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
-      switch (max) {
-        case r:
-          h = (g - b) / d + (g < b ? 6 : 0)
-          break
-        case g:
-          h = (b - r) / d + 2
-          break
-        case b:
-          h = (r - g) / d + 4
-          break
-      }
-      h /= 6
-    }
-
-    return {
-      h: Math.round(h * 360),
-      s: Math.round(s * 100),
-      l: Math.round(l * 100),
-    }
-  }
-
   const handleSync = async () => {
     if (!channel) {
       alert("No realtime channel available")
       return
     }
-
+    const syncedPalette: Palette = {
+      colors: editedColors,
+      keywords: [palette.keywords[0]],
+      is_ai_generated: palette.is_ai_generated,
+    }
     channel.send({
       type: "broadcast",
       event: "palette-updated",
       payload: {
-        palette: {
-          colors: editedColors,
-          keyword,
-          source,
-        },
+        palette: syncedPalette,
       },
     })
   }
-
-  // Sync editedColors with colors prop when colors changes
-  useEffect(() => {
-    setEditedColors(colors)
-  }, [colors])
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
@@ -288,7 +176,7 @@ export function PaletteDisplay({
             <div>
               <CardTitle className="text-xl flex items-center gap-2">
                 Generated Palette
-                {source === "ai" ? (
+                {palette.is_ai_generated ? (
                   <Badge variant="secondary" className="gap-1">
                     <Sparkles className="w-3 h-3" />
                     AI Generated
@@ -307,7 +195,7 @@ export function PaletteDisplay({
                 )}
               </CardTitle>
               <Badge variant="secondary" className="mt-2">
-                {keyword}
+                {palette.keywords[0]}
               </Badge>
             </div>
             <div className="flex gap-2">
@@ -632,25 +520,10 @@ export function PaletteDisplay({
             </div>
           </div>
 
-          <div className="flex justify-center gap-2 pb-6 mx-6">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                  <ChevronDown className="w-4 h-4 ml-2" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => exportPalette("css")}>CSS Variables</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => exportPalette("scss")}>SCSS Variables</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => exportPalette("tailwind")}>Tailwind Config</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => exportPalette("json")}>JSON Format</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => exportPalette("adobe")}>Adobe Swatch</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => exportPalette("figma")}>Figma Plugin</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <PaletteExport
+            colors={editedColors}
+            keyword={palette.keywords[0]}
+          />
         </CardContent>
       </Card>
     </motion.div>

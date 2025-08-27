@@ -1,13 +1,17 @@
-import { generateText } from "ai"
-import { google } from "@ai-sdk/google"
-import { type NextRequest, NextResponse } from "next/server"
+import { generateText } from "ai";
+import { google } from "@ai-sdk/google";
+import { type NextRequest, NextResponse } from "next/server";
+import type { Palette } from "@/app/types/global";
 
 export async function POST(request: NextRequest) {
   try {
-    const { keyword } = await request.json()
+    const { keyword } = await request.json();
 
     if (!keyword || typeof keyword !== "string") {
-      return NextResponse.json({ error: "Keyword is required" }, { status: 400 })
+      return NextResponse.json(
+        { error: "Keyword is required" },
+        { status: 400 }
+      );
     }
 
     const { text } = await generateText({
@@ -55,13 +59,13 @@ Example format:
 #334155
 
 Keyword: ${keyword}`,
-    })
+    });
 
     const colors = text
       .split("\n")
       .map((line) => line.trim())
       .filter((line) => line.match(/^#[0-9A-Fa-f]{6}$/))
-      .slice(0, 11)
+      .slice(0, 11);
 
     if (colors.length !== 11) {
       const fallbackPalettes: Record<string, string[]> = {
@@ -130,25 +134,33 @@ Keyword: ${keyword}`,
           "#1E293B",
           "#334155",
         ],
-      }
+      };
 
-      const matchedKey = Object.keys(fallbackPalettes).find((key) => keyword.toLowerCase().includes(key))
-      const fallbackColors = fallbackPalettes[matchedKey || "tech"]
+      const matchedKey = Object.keys(fallbackPalettes).find((key) =>
+        keyword.toLowerCase().includes(key)
+      );
+      const fallbackColors = fallbackPalettes[matchedKey || "tech"];
 
-      return NextResponse.json({
+      const generatedPalette: Palette = {
         colors: fallbackColors,
-        keyword,
-        source: "fallback",
-      })
+        keywords: [keyword],
+        is_ai_generated: false,
+      };
+
+      return NextResponse.json(generatedPalette);
     }
 
-    return NextResponse.json({
+    const generatedPalette: Palette = {
       colors,
-      keyword,
-      source: "ai",
-    })
+      keywords: [keyword],
+      is_ai_generated: false,
+    };
+    return NextResponse.json(generatedPalette);
   } catch (error) {
-    console.error("Error generating palette:", error)
-    return NextResponse.json({ error: "Failed to generate palette" }, { status: 500 })
+    console.error("Error generating palette:", error);
+    return NextResponse.json(
+      { error: "Failed to generate palette" },
+      { status: 500 }
+    );
   }
 }

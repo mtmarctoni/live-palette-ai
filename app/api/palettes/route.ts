@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { StoredUserPalettes } from "@/app/types/global";
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -22,11 +23,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { data: palettes, error } = await supabase
+    const { data, error } = await supabase
       .from("palettes")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
+
+    const palettes = data as StoredUserPalettes[];
+    console.log("palettes from supabase", palettes);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { PaletteGenerator } from "@/components/palette-generator"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Sparkles, Download, History, Users, AlertCircle } from "lucide-react"
 import CollaborativePalette from "@/components/collaboration/collaborative-palette"
@@ -14,17 +13,12 @@ import Footer from "@/components/layout/Footer"
 import { supabase } from "@/lib/supabase/client"
 import VersionHistoryPanel from "@/components/version-history/version-history-panel"
 import type { RealtimeChannel, Session, User as SupabaseUser } from "@supabase/supabase-js"
-
-interface PaletteResponse {
-  colors: string[]
-  keyword: string
-  source: "ai" | "fallback"
-}
+import type { Palette, StoredUserPalettes } from "./types/global"
 
 export default function HomePage() {
   const [session, setSession] = useState<Session | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
-  const [currentPalette, setCurrentPalette] = useState<PaletteResponse | null>(null)
+  const [currentPalette, setCurrentPalette] = useState<Palette | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [showVersionHistory, setShowVersionHistory] = useState(false)
@@ -57,7 +51,7 @@ export default function HomePage() {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [setCurrentPalette]);
 
   const handleGenerate = async (keyword: string) => {
     if (!keyword.trim()) return
@@ -79,7 +73,7 @@ export default function HomePage() {
         throw new Error("Failed to generate palette")
       }
 
-      const data: PaletteResponse = await response.json()
+      const data: StoredUserPalettes = await response.json()
       setCurrentPalette(data)
 
       // Broadcast palette update to Supabase Realtime using the shared channel
@@ -109,11 +103,11 @@ export default function HomePage() {
           "Authorization": `Bearer ${session?.access_token}`,
         },
         body: JSON.stringify({
-          name: `${currentPalette.keyword} Palette`,
-          description: `Generated from keyword: ${currentPalette.keyword}`,
+          name: `${currentPalette.keywords[0]} Palette`,
+          description: `Generated from keyword: ${currentPalette.keywords[0]}`,
           colors: currentPalette.colors,
-          keywords: [currentPalette.keyword],
-          is_ai_generated: currentPalette.source === "ai",
+          keywords: currentPalette.keywords,
+          is_ai_generated: currentPalette.is_ai_generated || false,
         }),
       })
 
@@ -123,7 +117,7 @@ export default function HomePage() {
 
         // Create initial version
         await fetch(`/api/palettes/${palette.id}`, {
-          method: "POST",
+          method: "PATCH",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${session?.access_token}`,
@@ -139,22 +133,23 @@ export default function HomePage() {
     }
   }
 
-  const handleRestoreVersion = async (version: any) => {
-    const restoredPalette: PaletteResponse = {
-      colors: version.colors,
-      keyword: currentPalette?.keyword || "Restored",
-      source: "fallback" as "ai" | "fallback",
+  const handleRestoreVersion = async (palette: Palette) => {
+    const restoredPalette: Palette = {
+      colors: palette.colors,
+      keywords: palette.keywords || ["Restored"],
+      is_ai_generated: palette.is_ai_generated || false,
     }
     setCurrentPalette(restoredPalette)
     setShowVersionHistory(false)
 
-    // Broadcast palette update to Supabase Realtime
-    const channel = supabase.channel("collaborative-palette")
-    channel.send({
-      type: "broadcast",
-      event: "palette-updated",
-      payload: { palette: restoredPalette },
-    })
+    // Broadcast palette update to Supabase Realtime using shared channel
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: "broadcast",
+        event: "palette-updated",
+        payload: { palette: restoredPalette },
+      })
+    }
   }
 
   return (
@@ -170,7 +165,7 @@ export default function HomePage() {
         session={session}
         isOpen={showVersionHistory}
         onClose={() => setShowVersionHistory(false)}
-        onRestoreVersion={handleRestoreVersion}
+        onRestoreVersion={(palette) => handleRestoreVersion(palette)}
       />
 
       <Header 
