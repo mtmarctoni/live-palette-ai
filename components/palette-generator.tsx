@@ -6,7 +6,8 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Sparkles, Palette } from "lucide-react"
+import { Sparkles, Palette as PaletteIcon } from "lucide-react"
+import { Badge } from "./ui/badge"
 
 interface PaletteGeneratorProps {
   onGenerate: (keyword: string) => void
@@ -35,10 +36,10 @@ export function PaletteGenerator({ onGenerate, isGenerating }: PaletteGeneratorP
   ]
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full mx-auto">
       <CardHeader className="text-center">
         <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Palette className="w-6 h-6 text-primary" />
+          <PaletteIcon className="w-6 h-6 text-primary" />
         </div>
         <CardTitle className="text-2xl">Generate Your Palette</CardTitle>
         <CardDescription>Describe the mood, brand, or feeling you want to capture</CardDescription>
@@ -72,11 +73,18 @@ export function PaletteGenerator({ onGenerate, isGenerating }: PaletteGeneratorP
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground text-center">Try these popular keywords:</p>
           <div className="flex flex-wrap gap-2 justify-center">
-            {sampleKeywords.map((sample) => (
-              <Button key={sample} variant="outline" size="sm" onClick={() => setKeyword(sample)} className="text-xs">
-                {sample}
-              </Button>
-            ))}
+            {sampleKeywords.map(
+              (sample) => (
+                <Badge
+                  key={sample}
+                  variant="outline"
+                  className="cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors"
+                  onClick={() => setKeyword(sample)}
+                >
+                  {sample}
+                </Badge>
+              ),
+            )}
           </div>
         </div>
       </CardContent>

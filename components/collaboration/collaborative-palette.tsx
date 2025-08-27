@@ -1,53 +1,41 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { supabase } from "@/lib/supabase/client"
-import { RealtimeChannel } from "@supabase/supabase-js"
 import { PaletteDisplay } from "@/components/palette-display"
+import LiveCursors from "./live-cursors"
+import { Palette } from "@/app/types/global"
 
 interface CollaborativePaletteProps {
-  palette: {
-    colors: string[]
-    keyword: string
-    source: "ai" | "fallback"
-  } | null
+  palette: Palette | null
   onPaletteUpdate: (palette: any) => void
+  channel?: any
 }
 
-export default function CollaborativePalette({ palette, onPaletteUpdate }: CollaborativePaletteProps) {
-  const [selectedColors, setSelectedColors] = useState<Record<string, string>>({})
+export default function CollaborativePalette({ palette: initialPalette, onPaletteUpdate, channel }: CollaborativePaletteProps) {
+  const [palette, setPalette] = useState(initialPalette)
+  const paletteContainerRef = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>;
+
+  // Always call parent callback and update local state
+  const handlePaletteUpdate = (updatedPalette: any) => {
+    setPalette(updatedPalette)
+    onPaletteUpdate(updatedPalette)
+  }
 
   useEffect(() => {
-    // Create a Supabase Realtime channel for palette collaboration
-    const channel: RealtimeChannel = supabase.channel("collaborative-palette")
-
-    // Listen for palette updates
-    channel.on("broadcast", { event: "palette-updated" }, (payload) => {
+    if (!channel) return
+    // Listen for palette-updated broadcast to update local palette
+    channel.on("broadcast", { event: "palette-updated" }, (payload: any) => {
+      setPalette(payload.payload.palette)
       onPaletteUpdate(payload.payload.palette)
     })
+    // No need to subscribe/unsubscribe here, handled in HomePage
+  }, [channel, onPaletteUpdate])
 
-    // Listen for color selection
-    channel.on("broadcast", { event: "color-selected" }, (payload) => {
-      const { userId, color } = payload.payload
-      setSelectedColors((prev) => ({
-        ...prev,
-        [userId]: color,
-      }))
-      setTimeout(() => {
-        setSelectedColors((prev) => {
-          const newSelections = { ...prev }
-          delete newSelections[userId]
-          return newSelections
-        })
-      }, 2000)
-    })
-
-    channel.subscribe()
-
-    return () => {
-      channel.unsubscribe()
-    }
-  }, [onPaletteUpdate])
+  // Sync local palette with initialPalette prop
+  useEffect(() => {
+    setPalette(initialPalette)
+  }, [initialPalette])
 
   const handleColorClick = async (color: string) => {
     // Get userId from Supabase Auth
@@ -56,26 +44,28 @@ export default function CollaborativePalette({ palette, onPaletteUpdate }: Colla
     if (data?.user) {
       userId = data.user.id
     }
-    const channel: RealtimeChannel = supabase.channel("collaborative-palette")
-    channel.send({
-      type: "broadcast",
-      event: "color-selected",
-      payload: { userId, color },
-    })
+    if (channel) {
+      channel.send({
+        type: "broadcast",
+        event: "color-selected",
+        payload: { userId, color },
+      })
+    }
     navigator.clipboard.writeText(color)
   }
 
   if (!palette) return null
 
   return (
-    <div className="relative">
+    <div className="relative" style={{ position: "relative" }} ref={paletteContainerRef}>
       <PaletteDisplay
-        colors={palette.colors}
-        keyword={palette.keyword}
-        source={palette.source}
+        palette={palette}
         onColorClick={handleColorClick}
-        selectedColors={selectedColors}
+        channel={channel}
+        onPaletteUpdate={handlePaletteUpdate}
       />
+      {/* LiveCursors only inside palette container, pass ref */}
+      <LiveCursors containerRef={paletteContainerRef} />
     </div>
   )
 }

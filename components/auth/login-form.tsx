@@ -83,7 +83,7 @@ export default function LoginForm() {
         </Button>
 
         <div className="text-center text-gray-600">
-          Don't have an account?{" "}
+          Do not have an account?{" "}
           <Link href="/auth/signup" className="text-cyan-600 hover:underline">
             Sign up
           </Link>

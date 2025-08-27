@@ -2,73 +2,63 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { PaletteGenerator } from "@/components/palette-generator"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Sparkles, Download, History, Users, AlertCircle } from "lucide-react"
-import { PaletteDisplay } from "@/components/palette-display"
+import CollaborativePalette from "@/components/collaboration/collaborative-palette"
+import { useRef } from "react"
+import Header from "@/components/layout/Header"
+import Footer from "@/components/layout/Footer"
 import { supabase } from "@/lib/supabase/client"
-import LiveCursors from "@/components/collaboration/live-cursors"
-import UserPresence from "@/components/collaboration/user-presence"
-import AuthButton from "@/components/auth/auth-button"
 import VersionHistoryPanel from "@/components/version-history/version-history-panel"
-import { ThemeToggle } from "@/components/theme-toggle"
-import type { User as SupabaseUser } from "@supabase/supabase-js"
-
-interface PaletteResponse {
-  colors: string[]
-  keyword: string
-  source: "ai" | "fallback"
-}
+import type { RealtimeChannel, Session, User as SupabaseUser } from "@supabase/supabase-js"
+import type { Palette, StoredUserPalettes } from "./types/global"
 
 export default function HomePage() {
-  const [keyword, setKeyword] = useState("")
+  const [session, setSession] = useState<Session | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
-  const [currentPalette, setCurrentPalette] = useState<PaletteResponse | null>(null)
+  const [currentPalette, setCurrentPalette] = useState<Palette | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [showVersionHistory, setShowVersionHistory] = useState(false)
   const [currentPaletteId, setCurrentPaletteId] = useState<string | null>(null)
+  const channelRef = useRef<RealtimeChannel>(null)
 
   useEffect(() => {
-    const getUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      setUser(user)
-
-      if (user) {
-        // set user with realtime supabase
-      }
+    // Create and subscribe to the collaborative-palette channel once
+    if (!channelRef.current) {
+      channelRef.current = supabase.channel("collaborative-palette")
+      channelRef.current.on("broadcast", { event: "palette-updated" }, (payload: any) => {
+        setCurrentPalette(payload.payload.palette)
+      })
+      channelRef.current.subscribe()
     }
+    const getAuthData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+    };
 
-    getUser()
+    getAuthData();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      const newUser = session?.user ?? null
-      setUser(newUser)
-
-      if (newUser) {
-        // set user with realtime supabase
-      } else {
-        // set user with realtime supabase
-      }
-    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      setSession(session ?? null);
+    });
 
     return () => {
-      subscription.unsubscribe()
-      // disconnect from realtime supabase
-    }
-  }, [])
+      subscription.unsubscribe();
+    };
+  }, [setCurrentPalette]);
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (keyword: string) => {
     if (!keyword.trim()) return
 
     setIsGenerating(true)
     setError(null)
+    setCurrentPaletteId(null)
 
     try {
       const response = await fetch("/api/generate-palette", {
@@ -83,11 +73,17 @@ export default function HomePage() {
         throw new Error("Failed to generate palette")
       }
 
-      const data: PaletteResponse = await response.json()
+      const data: StoredUserPalettes = await response.json()
       setCurrentPalette(data)
 
-      // if connected to RT supabase emit("palette-update", { palette: data })
-    
+      // Broadcast palette update to Supabase Realtime using the shared channel
+      if (channelRef.current) {
+        channelRef.current.send({
+          type: "broadcast",
+          event: "palette-updated",
+          payload: { palette: data },
+        })
+      }
     } catch (err) {
       setError("Failed to generate palette. Please try again.")
       console.error("Error:", err)
@@ -104,13 +100,14 @@ export default function HomePage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token}`,
         },
         body: JSON.stringify({
-          name: `${currentPalette.keyword} Palette`,
-          description: `Generated from keyword: ${currentPalette.keyword}`,
+          name: `${currentPalette.keywords[0]} Palette`,
+          description: `Generated from keyword: ${currentPalette.keywords[0]}`,
           colors: currentPalette.colors,
-          keywords: [currentPalette.keyword],
-          is_ai_generated: currentPalette.source === "ai",
+          keywords: currentPalette.keywords,
+          is_ai_generated: currentPalette.is_ai_generated || false,
         }),
       })
 
@@ -119,10 +116,11 @@ export default function HomePage() {
         setCurrentPaletteId(palette.id)
 
         // Create initial version
-        await fetch(`/api/palettes/${palette.id}/versions`, {
-          method: "POST",
+        await fetch(`/api/palettes/${palette.id}`, {
+          method: "PATCH",
           headers: {
             "Content-Type": "application/json",
+            "Authorization": `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({
             colors: currentPalette.colors,
@@ -135,22 +133,23 @@ export default function HomePage() {
     }
   }
 
-  const handleRestoreVersion = async (version: any) => {
-    setCurrentPalette({
-      colors: version.colors,
-      keyword: currentPalette?.keyword || "Restored",
-      source: "fallback",
-    })
+  const handleRestoreVersion = async (palette: Palette) => {
+    const restoredPalette: Palette = {
+      colors: palette.colors,
+      keywords: palette.keywords || ["Restored"],
+      is_ai_generated: palette.is_ai_generated || false,
+    }
+    setCurrentPalette(restoredPalette)
     setShowVersionHistory(false)
 
-    // if connected to RT supabase emit("palette-update", {
-    //   palette: {
-    //     colors: version.colors,
-    //     keyword: currentPalette?.keyword || "Restored",
-    //     source: "fallback",
-    //   },
-    // })
-    
+    // Broadcast palette update to Supabase Realtime using shared channel
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: "broadcast",
+        event: "palette-updated",
+        payload: { palette: restoredPalette },
+      })
+    }
   }
 
   return (
@@ -162,49 +161,17 @@ export default function HomePage() {
         <div className="absolute bottom-60 right-10 w-96 h-96 bg-primary rounded-full blur-xl animate-pulse delay-500"></div>
       </div>
 
-      <LiveCursors />
-
       <VersionHistoryPanel
-        paletteId={currentPaletteId}
+        session={session}
         isOpen={showVersionHistory}
         onClose={() => setShowVersionHistory(false)}
-        onRestoreVersion={handleRestoreVersion}
+        onRestoreVersion={(palette) => handleRestoreVersion(palette)}
       />
 
-      <header className="border-b border-border bg-gradient-to-r from-background via-card to-background backdrop-blur-sm sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-lg">
-                <Sparkles className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-foreground">AI Color Palette Generator</h1>
-                <div className="flex gap-1 mt-1">
-                  <div className="w-2 h-2 bg-primary rounded-full"></div>
-                  <div className="w-2 h-2 bg-secondary rounded-full"></div>
-                  <div className="w-2 h-2 bg-accent rounded-full"></div>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <UserPresence />
-              <ThemeToggle />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowVersionHistory(true)}
-                disabled={!currentPaletteId}
-                className="border-primary/20 hover:bg-primary/5"
-              >
-                <History className="w-4 h-4 mr-2" />
-                History
-              </Button>
-              <AuthButton />
-            </div>
-          </div>
-        </div>
-      </header>
+      <Header 
+        onShowHistory={() => setShowVersionHistory(true)}
+        showHistoryDisabled={!user}
+      />
 
       <main className="container mx-auto px-4 py-12 relative z-10">
         <div className="text-center mb-12">
@@ -217,24 +184,13 @@ export default function HomePage() {
             marketers, and creative professionals.
           </p>
 
-          <div className="max-w-md mx-auto mb-8">
-            <div className="flex gap-2">
-              <Input
-                placeholder="e.g., energetic startup, calm healthcare..."
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
-                className="flex-1"
-              />
-              <Button onClick={handleGenerate} disabled={isGenerating || !keyword.trim()} className="px-6">
-                {isGenerating ? (
-                  <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4" />
-                )}
-                {isGenerating ? "Generating..." : "Generate"}
-              </Button>
-            </div>
+          <div className="max-w-4xl mx-auto mb-8">
+            <PaletteGenerator
+              onGenerate={(kw) => {
+                handleGenerate(kw)
+              }}
+              isGenerating={isGenerating}
+            />
           </div>
 
           {error && (
@@ -243,32 +199,23 @@ export default function HomePage() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-
-          <div className="flex flex-wrap justify-center gap-2 mb-12">
-            {["energetic startup", "calm healthcare", "luxury brand", "nature inspired", "tech minimal"].map(
-              (sample) => (
-                <Badge
-                  key={sample}
-                  variant="outline"
-                  className="cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors"
-                  onClick={() => setKeyword(sample)}
-                >
-                  {sample}
-                </Badge>
-              ),
-            )}
-          </div>
+        
         </div>
 
         {currentPalette && (
           <div className="mb-12">
-            <PaletteDisplay
-              colors={currentPalette.colors}
-              keyword={currentPalette.keyword}
-              source={currentPalette.source}
-              onSave={user ? handleSavePalette : undefined}
-              onShowHistory={currentPaletteId ? () => setShowVersionHistory(true) : undefined}
+            <CollaborativePalette
+              palette={currentPalette}
+              onPaletteUpdate={(palette) => setCurrentPalette(palette)}
+              channel={channelRef.current}
             />
+            {user && (
+              <div className="flex justify-center mt-6">
+                <Button onClick={handleSavePalette} disabled={!!currentPaletteId}>
+                  {currentPaletteId ? "Palette Saved" : "Save Palette"}
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
@@ -379,50 +326,7 @@ export default function HomePage() {
         </div>
       </main>
 
-      <footer className="border-t border-border bg-gradient-to-r from-card via-background to-card relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-secondary/5"></div>
-        <div className="container mx-auto px-4 py-12 relative z-10">
-          <div className="grid md:grid-cols-3 gap-8 mb-8">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-xl">
-                <Sparkles className="w-8 h-8 text-primary-foreground" />
-              </div>
-              <h4 className="font-semibold text-foreground mb-2">AI Color Palette Generator</h4>
-              <p className="text-sm text-muted-foreground">Transform ideas into beautiful color combinations</p>
-            </div>
-
-            <div className="text-center">
-              <h4 className="font-semibold text-foreground mb-4">Color Harmony</h4>
-              <div className="flex justify-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-primary rounded-lg shadow-md"></div>
-                <div className="w-8 h-8 bg-secondary rounded-lg shadow-md"></div>
-                <div className="w-8 h-8 bg-accent rounded-lg shadow-md"></div>
-                <div className="w-8 h-8 bg-gradient-to-r from-primary to-secondary rounded-lg shadow-md"></div>
-              </div>
-              <p className="text-sm text-muted-foreground">Perfect color relationships</p>
-            </div>
-
-            <div className="text-center">
-              <h4 className="font-semibold text-foreground mb-4">Live Preview</h4>
-              <div className="space-y-2 mb-4">
-                <div className="h-2 bg-gradient-to-r from-primary via-secondary to-accent rounded-full"></div>
-                <div className="h-2 bg-gradient-to-r from-accent via-primary to-secondary rounded-full"></div>
-                <div className="h-2 bg-gradient-to-r from-secondary via-accent to-primary rounded-full"></div>
-              </div>
-              <p className="text-sm text-muted-foreground">See changes in real-time</p>
-            </div>
-          </div>
-
-          <div className="text-center pt-8 border-t border-border/50">
-            <div className="flex justify-center gap-1 mb-4">
-              <div className="w-3 h-3 bg-primary rounded-full animate-pulse"></div>
-              <div className="w-3 h-3 bg-secondary rounded-full animate-pulse delay-200"></div>
-              <div className="w-3 h-3 bg-accent rounded-full animate-pulse delay-400"></div>
-            </div>
-            <p className="text-muted-foreground">&copy; 2025 AI Color Palette Generator. Built with Next.js and AI.</p>
-          </div>
-        </div>
-      </footer>
+  <Footer />
     </div>
   )
 }
