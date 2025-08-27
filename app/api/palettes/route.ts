@@ -30,7 +30,6 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false });
 
     const palettes = data as StoredUserPalettes[];
-    console.log("palettes from supabase", palettes);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
